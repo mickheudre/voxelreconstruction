@@ -1,0 +1,13 @@
+project(Logger)
+cmake_minimum_required(VERSION 2.8)
+
+set( LOGGER_SRC
+	 src/Logger.cpp
+   )
+
+set( LOGGER_INCLUDE
+	 include/Logger.h
+	 include/DualStream.h
+   )
+
+
