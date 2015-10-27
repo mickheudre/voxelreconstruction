@@ -113,7 +113,7 @@ int main(int argc, char **argv){
     int nb_cameras = 12;
     int image_width = 1920;
     int image_heigh = 1080;
-    float block_size = 0.02;
+    float block_size = 0.03;
 
 
     Mesh3D::Mesh cube = point_cloud_to_voxels(std::vector<Mesh3D::float3>(),0.1);
@@ -198,24 +198,30 @@ int main(int argc, char **argv){
                 }
                 if (count > 8){
                     //                    std::cout << 'Visible' << std::endl;
-                    visible_points.push_back(Mesh3D::make_float3(current_voxel[0],current_voxel[1],current_voxel[2]));
+                    vg.set_bit(1,x,y,z);
+//                    visible_points.push_back(Mesh3D::make_float3(current_voxel[0],current_voxel[1],current_voxel[2]));
                 }
             }
         }
 
     }
 
-    //    for (int x = 0; x < x_sampling; x++){
-    //        for (int y = 0; y < y_sampling; y++){
-    //            for (int z = 0; z < z_sampling; z++){
-    //                if (vg.get_data(x,y,z) == 1){
-    //                    Vector3 current_voxel= Vector3(area_min[0],0,area_min[2]) + Vector3(x*block_size,y*block_size,z*block_size);
 
-    //                }
 
-    //            }
-    //        }
-    //    }
+    std::cout << "Filtering Mesh : all voxels inside of the shape will be deleted" << std::endl;
+
+    for (int x = 0; x < x_sampling; x++){
+        for (int y = 0; y < y_sampling; y++){
+            for (int z = 0; z < z_sampling; z++){
+
+                if (vg.get_data(x,y,z) == 1 && (!vg.get_data(x+1,y,z) || !vg.get_data(x-1,y,z) || !vg.get_data(x,y+1,z) || !vg.get_data(x,y-1,z) || !vg.get_data(x,y,z-1) || !vg.get_data(x,y,z+1))){
+                    Vector3 current_voxel= Vector3(area_min[0],0,area_min[2]) + Vector3(x*block_size,y*block_size,z*block_size);
+                    visible_points.push_back(Mesh3D::make_float3(current_voxel[0],current_voxel[1],current_voxel[2]));
+                }
+            }
+        }
+    }
+
     std::cout << "Saving Mesh" << std::endl;
     Mesh3D::Mesh mesh = point_cloud_to_voxels(visible_points,block_size,0.9);
     //    mesh.set_vertices(visible_points);
