@@ -106,14 +106,15 @@ private:
 };
 
 int main(int argc, char **argv){
+
     std::string camera_path = "/morpheo-nas/React/TOPROCESS/Calibration/%02d.txt";
     std::string silhouettes_path = "/morpheo-nas/React/TOPROCESS/IWONDER/Silhouettes/%02d.png";
-
+    std::string images_path = "/morpheo-nas/React/TOPROCESS/IWONDER/Images/%02d.png";
     int current_camera = 5;
     int nb_cameras = 12;
     int image_width = 1920;
     int image_heigh = 1080;
-    float block_size = 0.03;
+    float block_size = 0.01;
 
 
     Mesh3D::Mesh cube = point_cloud_to_voxels(std::vector<Mesh3D::float3>(),0.1);
@@ -155,9 +156,13 @@ int main(int argc, char **argv){
     VoxelGrid vg(x_sampling,y_sampling,z_sampling);
     std::vector<Mesh3D::float3> visible_points;
     std::vector<Mat> silhouettes;
+    std::vector<Mat> images;
+
     for (int i = 0; i < nb_cameras; i++){
         Mat image = imread((boost::format(silhouettes_path)%i).str(),CV_LOAD_IMAGE_GRAYSCALE);
         silhouettes.push_back(image);
+        Mat col_image = imread((boost::format(images_path)%i).str());
+        images.push_back(col_image);
     }
     for (int x = 0; x < x_sampling; x++){
         for (int y = 0; y < y_sampling; y++){
@@ -199,7 +204,7 @@ int main(int argc, char **argv){
                 if (count > 8){
                     //                    std::cout << 'Visible' << std::endl;
                     vg.set_bit(1,x,y,z);
-//                    visible_points.push_back(Mesh3D::make_float3(current_voxel[0],current_voxel[1],current_voxel[2]));
+                    //                    visible_points.push_back(Mesh3D::make_float3(current_voxel[0],current_voxel[1],current_voxel[2]));
                 }
             }
         }
@@ -209,7 +214,7 @@ int main(int argc, char **argv){
 
 
     std::cout << "Filtering Mesh : all voxels inside of the shape will be deleted" << std::endl;
-
+    std::vector<Mesh3D::Color> voxel_colors;
     for (int x = 0; x < x_sampling; x++){
         for (int y = 0; y < y_sampling; y++){
             for (int z = 0; z < z_sampling; z++){
@@ -217,19 +222,64 @@ int main(int argc, char **argv){
                 if (vg.get_data(x,y,z) == 1 && (!vg.get_data(x+1,y,z) || !vg.get_data(x-1,y,z) || !vg.get_data(x,y+1,z) || !vg.get_data(x,y-1,z) || !vg.get_data(x,y,z-1) || !vg.get_data(x,y,z+1))){
                     Vector3 current_voxel= Vector3(area_min[0],0,area_min[2]) + Vector3(x*block_size,y*block_size,z*block_size);
                     visible_points.push_back(Mesh3D::make_float3(current_voxel[0],current_voxel[1],current_voxel[2]));
+
+
+
+                    Matrix<4,1> space_vector;
+                    space_vector[0][0] = current_voxel[0];
+                    space_vector[1][0] = current_voxel[1];
+                    space_vector[2][0] = current_voxel[2];
+                    space_vector[3][0] = 1;
+
+                    int r = 0;
+                    int g = 0;
+                    int b = 0;
+
+                    for (int i=0; i < nb_cameras; i++){
+                        std::cout << i << std::endl;
+                        Matrix3x4 proj_matrix = cameras[i].getProjection();
+
+                        Matrix<3,1> proj = proj_matrix * space_vector;
+
+                        int u = proj[0][0]/proj[2][0];
+                        int v = proj[1][0]/proj[2][0];
+                        std::cout << u << " " << v << std::endl;
+
+                        Vec3b color = images[i].at<Vec3b>(v,u);
+//                        circle(images[i],Point(u,v),2,0);
+//                        images[i].at<uchar>(v,u)= 255;
+                        r += int(color.val[2]);
+                        g +=  int(color.val[1]);
+                        b += int(color.val[0]);
+                        std::cout << color << std::endl;
+                    }
+
+                    r /= nb_cameras;
+                    g /= nb_cameras;
+                    b /= nb_cameras;
+
+                    if (b > (g+r)/2) b = (r+g)/2;
+                    for (int j = 0; j < 8; j++){
+                        voxel_colors.push_back(Mesh3D::Color(r,g,b));
+                    }
                 }
             }
         }
     }
 
+    //Get the color information for every voxel
+
+
+
     std::cout << "Saving Mesh" << std::endl;
     Mesh3D::Mesh mesh = point_cloud_to_voxels(visible_points,block_size,0.9);
+    mesh.set_colors(voxel_colors);
     //    mesh.set_vertices(visible_points);
-    mesh.save("/tmp/test.obj");
-    //    namedWindow( "Display window", WINDOW_AUTOSIZE );// Create a window for display.
-    //    imshow( "Display window", image );                   // Show our image inside it.
+    mesh.save("/tmp/test.off");
+//        namedWindow( "Display window", WINDOW_AUTOSIZE );// Create a window for display.
+//        imshow( "Display window", images[0] );                   // Show our image inside it.
 
-    //    waitKey(0);                                          // Wait for a keystroke in the window
-    //    return 0;
+//        waitKey(0);                                          // Wait for a keystroke in the window
+//        return 0;
 }
 
